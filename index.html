@@ -100,6 +100,12 @@ h2{font-family:var(--disp);font-size:20px;font-weight:800}
 .center{text-align:center}
 .mt{margin-top:16px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* v3 新增 */
+.node{position:relative;cursor:pointer}
+.node:active{transform:scale(.93)}
+.node .dot{position:absolute;top:2px;right:4px;width:12px;height:12px;border-radius:50%;background:var(--amber);border:2px solid var(--bg)}
+.node.lock{opacity:.45;cursor:default}
 </style>
 </head>
 <body>
@@ -112,59 +118,71 @@ window.onerror=function(msg,src,line,col){
   return false;};
 </script>
 <noscript><div style="color:#fff;padding:30px;font-size:16px">这个页面需要 JavaScript。请在 Safari 设置中允许 JavaScript 后刷新。</div></noscript>
-<div id="app"></div>
+<div id="app"><div style="color:#8FA6C0;padding:40px 20px;font-size:16px;text-align:center">正在加载…<br><br>如果这行字超过 5 秒仍然显示,请截图发给 Claude。</div></div>
 <div class="combo" id="combo"></div>
 <script>
 "use strict";
-/* ============ 拼读单元数据(6 阶段 · 29 单元) ============ */
+/* ============ 拼读单元数据(29 单元 · 基础+进阶分层) ============ */
+/* adv 选词纪律:只含当前规律+此前已教内容;前期单元一律单音节 */
 const UNITS=[
- {id:"u1",ph:1,pat:"a",name:"短元音 a",cn:"a 发短促的 /æ/,像被轻拍一下发出的音",words:["cat","hat","map","bag","can"]},
- {id:"u2",ph:1,pat:"e",name:"短元音 e",cn:"e 发短促的 /e/",words:["bed","pen","red","ten","leg"]},
- {id:"u3",ph:1,pat:"i",name:"短元音 i",cn:"i 发短促的 /ɪ/",words:["big","pig","sit","win","hit"]},
- {id:"u4",ph:1,pat:"o",name:"短元音 o",cn:"o 发短促的 /ɒ/,嘴张圆",words:["dog","hot","top","box","not"]},
- {id:"u5",ph:1,pat:"u",name:"短元音 u",cn:"u 发短促的 /ʌ/",words:["bus","cup","run","sun","fun"]},
- {id:"u6",ph:2,pat:"sh",name:"辅音组合 sh",cn:"s+h 合成一个音 /ʃ/,像'嘘——'",words:["ship","shop","fish","wish","shut"]},
- {id:"u7",ph:2,pat:"ch",name:"辅音组合 ch",cn:"c+h 合成 /tʃ/,像小火车'吃吃吃'",words:["chip","chat","lunch","much","rich"]},
- {id:"u8",ph:2,pat:"th",name:"辅音组合 th",cn:"舌尖轻咬,气从缝里出来",words:["this","that","math","with","thin"]},
- {id:"u9",ph:2,pat:"ck",name:"词尾 ck / ng",cn:"ck 只发一个 /k/;ng 是鼻音 /ŋ/",words:["back","kick","ring","king","song"]},
- {id:"u10",ph:2,pat:"bl",name:"开头双辅音 bl/cl/fl/pl",cn:"两个辅音连着快速读,不加元音",words:["black","club","flag","plan","flip"]},
- {id:"u11",ph:2,pat:"st",name:"开头双辅音 st/sp/sn/sw",cn:"s 打头的双辅音,s 轻轻带过",words:["stop","spin","snap","swim","star"]},
- {id:"u12",ph:3,pat:"a_e",name:"神奇 e:a_e",cn:"词尾的 e 不发音,但让前面的 a 读字母名 /eɪ/",words:["make","game","name","face","late"]},
- {id:"u13",ph:3,pat:"i_e",name:"神奇 e:i_e",cn:"词尾 e 让 i 读字母名 /aɪ/",words:["like","bike","time","nine","ride"]},
- {id:"u14",ph:3,pat:"o_e",name:"神奇 e:o_e / u_e",cn:"同一个魔法:o 读 /oʊ/,u 读 /juː/",words:["home","note","hope","cute","rule"]},
- {id:"u15",ph:4,pat:"ee",name:"元音组合 ee / ea",cn:"两个字母手拉手,发长音 /iː/",words:["see","tree","eat","team","read"]},
- {id:"u16",ph:4,pat:"ai",name:"元音组合 ai / ay",cn:"都发 /eɪ/;ai 在词中,ay 在词尾",words:["rain","wait","play","day","say"]},
- {id:"u17",ph:4,pat:"oa",name:"元音组合 oa / ow",cn:"都发 /oʊ/;ow 常在词尾",words:["boat","road","show","know","grow"]},
- {id:"u18",ph:4,pat:"oo",name:"元音组合 oo",cn:"oo 有长短两种:moon 长 /uː/,book 短 /ʊ/",words:["moon","food","book","look","good"]},
- {id:"u19",ph:4,pat:"ou",name:"元音组合 ou / ow",cn:"发 /aʊ/,像'嗷'",words:["out","loud","how","now","down"]},
- {id:"u20",ph:4,pat:"igh",name:"igh / 词尾 y",cn:"igh 里 gh 不发音,整体读 /aɪ/;词尾 y 也常读 /aɪ/",words:["night","light","right","my","fly"]},
- {id:"u21",ph:5,pat:"ar",name:"r 控元音 ar",cn:"a 被 r 拉住,读 /ɑːr/",words:["car","park","star","hard","farm"]},
- {id:"u22",ph:5,pat:"or",name:"r 控元音 or",cn:"o 被 r 拉住,读 /ɔːr/",words:["for","sport","short","corn","born"]},
- {id:"u23",ph:5,pat:"er",name:"r 控元音 er/ir/ur",cn:"三胞胎,都读 /ɜːr/",words:["her","bird","girl","turn","hurt"]},
- {id:"u24",ph:6,pat:"aw",name:"aw / all",cn:"aw 和 all 里的 a 都读 /ɔː/",words:["saw","draw","ball","tall","call"]},
- {id:"u25",ph:6,pat:"oy",name:"oi / oy",cn:"发 /ɔɪ/,像'哦咦'连读",words:["oil","coin","boy","toy","join"]},
- {id:"u26",ph:6,pat:"ce",name:"软音 c / g",cn:"c 遇到 e/i/y 读 /s/;g 常读 /dʒ/",words:["city","ice","nice","page","age"]},
- {id:"u27",ph:6,pat:"ing",name:"后缀 -ing / -ed",cn:"动词的尾巴:-ing 进行中,-ed 已完成",words:["playing","jumping","played","wanted","helping"]},
- {id:"u28",ph:6,pat:"tion",name:"后缀 -tion / -le",cn:"-tion 读 /ʃən/;词尾 -le 前的辅音跟它一组",words:["action","station","little","table","apple"]},
- {id:"u29",ph:6,pat:"syll",name:"双音节拆分",cn:"长单词切成两块,一块一块读",words:["robot","music","sunset","weekend","basket"]}
+ {id:"u1",ph:1,pat:"a",name:"短元音 a",cn:"a 发短促的 /æ/,像被轻拍一下发出的音",words:["cat","hat","map","bag","can"],adv:["ham","pad","rag"]},
+ {id:"u2",ph:1,pat:"e",name:"短元音 e",cn:"e 发短促的 /e/",words:["bed","pen","red","ten","leg"],adv:["jet","web","vet"]},
+ {id:"u3",ph:1,pat:"i",name:"短元音 i",cn:"i 发短促的 /ɪ/",words:["big","pig","sit","win","hit"],adv:["dig","lip","fin"]},
+ {id:"u4",ph:1,pat:"o",name:"短元音 o",cn:"o 发短促的 /ɒ/,嘴张圆",words:["dog","hot","top","box","not"],adv:["pot","mop","log"]},
+ {id:"u5",ph:1,pat:"u",name:"短元音 u",cn:"u 发短促的 /ʌ/",words:["bus","cup","run","sun","fun"],adv:["mud","hug","tub"]},
+ {id:"u6",ph:2,pat:"sh",name:"辅音组合 sh",cn:"s+h 合成一个音 /ʃ/,像'嘘——'",words:["ship","shop","fish","wish","shut"],adv:["shed","dish","hush"]},
+ {id:"u7",ph:2,pat:"ch",name:"辅音组合 ch",cn:"c+h 合成 /tʃ/,像小火车'吃吃吃'",words:["chip","chat","lunch","much","rich"],adv:["chop","chin","such"]},
+ {id:"u8",ph:2,pat:"th",name:"辅音组合 th",cn:"舌尖轻咬,气从缝里出来",words:["this","that","math","with","thin"],adv:["them","then","moth"]},
+ {id:"u9",ph:2,pat:"ck",name:"词尾 ck / ng",cn:"ck 只发一个 /k/;ng 是鼻音 /ŋ/",words:["back","kick","ring","king","song"],adv:["duck","sock","lung"]},
+ {id:"u10",ph:2,pat:"bl",name:"开头双辅音 bl/cl/fl/pl",cn:"两个辅音连着快速读,不加元音",words:["black","club","flag","plan","flip"],adv:["clap","plum","block"]},
+ {id:"u11",ph:2,pat:"st",name:"开头双辅音 st/sp/sn/sw",cn:"s 打头的双辅音,s 轻轻带过",words:["stop","spin","snap","swim","star"],adv:["spot","stick","snack"]},
+ {id:"u12",ph:3,pat:"a_e",name:"神奇 e:a_e",cn:"词尾的 e 不发音,但让前面的 a 读字母名 /eɪ/",words:["make","game","name","face","late"],adv:["grape","plane","snake"]},
+ {id:"u13",ph:3,pat:"i_e",name:"神奇 e:i_e",cn:"词尾 e 让 i 读字母名 /aɪ/",words:["like","bike","time","nine","ride"],adv:["smile","prize","slide"]},
+ {id:"u14",ph:3,pat:"o_e",name:"神奇 e:o_e / u_e",cn:"同一个魔法:o 读 /oʊ/,u 读 /juː/",words:["home","note","hope","cute","rule"],adv:["stone","globe","flute"]},
+ {id:"u15",ph:4,pat:"ee",name:"元音组合 ee / ea",cn:"两个字母手拉手,发长音 /iː/",words:["see","tree","eat","team","read"],adv:["sleep","dream","cheap"]},
+ {id:"u16",ph:4,pat:"ai",name:"元音组合 ai / ay",cn:"都发 /eɪ/;ai 在词中,ay 在词尾",words:["rain","wait","play","day","say"],adv:["train","paint","stay"]},
+ {id:"u17",ph:4,pat:"oa",name:"元音组合 oa / ow",cn:"都发 /oʊ/;ow 常在词尾",words:["boat","road","show","know","grow"],adv:["float","coast","throw"]},
+ {id:"u18",ph:4,pat:"oo",name:"元音组合 oo",cn:"oo 有长短两种:moon 长 /uː/,book 短 /ʊ/",words:["moon","food","book","look","good"],adv:["spoon","tooth","stood"]},
+ {id:"u19",ph:4,pat:"ou",name:"元音组合 ou / ow",cn:"发 /aʊ/,像'嗷'",words:["out","loud","how","now","down"],adv:["cloud","shout","crowd"]},
+ {id:"u20",ph:4,pat:"igh",name:"igh / 词尾 y",cn:"igh 里 gh 不发音,整体读 /aɪ/;词尾 y 也常读 /aɪ/",words:["night","light","right","my","fly"],adv:["bright","flight","spy"]},
+ {id:"u21",ph:5,pat:"ar",name:"r 控元音 ar",cn:"a 被 r 拉住,读 /ɑːr/",words:["car","park","star","hard","farm"],adv:["smart","sharp","charm"]},
+ {id:"u22",ph:5,pat:"or",name:"r 控元音 or",cn:"o 被 r 拉住,读 /ɔːr/",words:["for","sport","short","corn","born"],adv:["storm","north","torch"]},
+ {id:"u23",ph:5,pat:"er",name:"r 控元音 er/ir/ur",cn:"三胞胎,都读 /ɜːr/",words:["her","bird","girl","turn","hurt"],adv:["nurse","shirt","burst"]},
+ {id:"u24",ph:6,pat:"aw",name:"aw / all",cn:"aw 和 all 里的 a 都读 /ɔː/",words:["saw","draw","ball","tall","call"],adv:["crawl","straw","small"]},
+ {id:"u25",ph:6,pat:"oy",name:"oi / oy",cn:"发 /ɔɪ/,像'哦咦'连读",words:["oil","coin","boy","toy","join"],adv:["spoil","point","enjoy"]},
+ {id:"u26",ph:6,pat:"ce",name:"软音 c / g",cn:"c 遇到 e/i/y 读 /s/;g 常读 /dʒ/",words:["city","ice","nice","page","age"],adv:["space","prince","stage"]},
+ {id:"u27",ph:6,pat:"ing",name:"后缀 -ing / -ed",cn:"动词的尾巴:-ing 进行中,-ed 已完成",words:["playing","jumping","played","wanted","helping"],adv:["singing","camping","painted"]},
+ {id:"u28",ph:6,pat:"tion",name:"后缀 -tion / -le",cn:"-tion 读 /ʃən/;词尾 -le 前的辅音跟它一组",words:["action","station","little","table","apple"],adv:["mention","candle","purple"]},
+ {id:"u29",ph:6,pat:"syll",name:"双音节拆分",cn:"长单词切成两块,一块一块读",words:["robot","music","sunset","weekend","basket"],adv:["drummer","rocket","contest"]}
 ];
 const PHASE_NAMES={1:"短元音",2:"辅音组合",3:"神奇 e",4:"元音组合",5:"r 控元音",6:"进阶规律"};
-const DIAG_UNITS=["u1","u2","u3","u4","u5","u6","u7","u8","u9","u10","u11"]; // 诊断只测前两阶段
-const ALL_WORDS=UNITS.flatMap(u=>u.words);
+const DIAG_UNITS=["u1","u2","u3","u4","u5","u6","u7","u8","u9","u10","u11"];
+const ALL_WORDS=UNITS.flatMap(u=>u.words.concat(u.adv));
+/* 最小对立对:短元音 vs 神奇e,一字之差见真章 */
+const MINPAIRS={hat:"hate",hate:"hat",plan:"plane",plane:"plan",hop:"hope",hope:"hop",
+ cut:"cute",cute:"cut",not:"note",note:"not",rid:"ride",ride:"rid",kit:"kite",kite:"kit",
+ tap:"tape",tape:"tap",mad:"made",made:"mad",can:"cane",win:"wine",pin:"pine",fin:"fine",
+ slid:"slide",slide:"slid",rat:"rate"};
 
 /* ============ 状态与存储 ============ */
-const DEFAULT_P={ver:1,stage:"diagnostic",done:{},skipped:{},sessions:0,streak:0,lastDay:"",
-  wordWrong:{},storyIdx:0,diagScore:null,gradScore:null,gradStep:0};
+const DEFAULT_P={ver:3,stage:"diagnostic",done:{},skipped:{},sessions:0,streak:0,lastDay:"",
+  wordWrong:{},storyIdx:0,storyDone:{},diagScore:null,gradScore:null,gradStep:0,lastLearned:null,mainDay:""};
 let memStore={};
 let P=loadP();
+migrate();
 function loadP(){try{const s=localStorage.getItem("phonicsQuest");return s?Object.assign({},DEFAULT_P,JSON.parse(s)):Object.assign({},DEFAULT_P);}catch(e){return Object.assign({},DEFAULT_P,memStore);}}
+function migrate(){ // 旧版进度无缝迁移
+  if(P.stage==="reading"){P.stage="done";
+    for(let i=0;i<P.storyIdx;i++)P.storyDone[i]=true;}
+  if(!P.storyDone)P.storyDone={};
+  if(P.ver<3){P.ver=3;saveP();}}
 function saveP(){try{localStorage.setItem("phonicsQuest",JSON.stringify(P));}catch(e){memStore=JSON.parse(JSON.stringify(P));}}
 function todayStr(){return new Date().toISOString().slice(0,10);}
 function bumpStreak(){const t=todayStr();if(P.lastDay===t)return;
   const y=new Date(Date.now()-864e5).toISOString().slice(0,10);
   P.streak=(P.lastDay===y)?P.streak+1:1;P.lastDay=t;saveP();}
 
-/* ============ 发音 (Web Speech) ============ */
+/* ============ 发音 / 音效 / 连击 ============ */
 let VOICE=null;
 function pickVoice(){const vs=speechSynthesis.getVoices();
   VOICE=vs.find(v=>v.name.includes("Samantha"))||vs.find(v=>v.lang==="en-US")||vs.find(v=>v.lang.startsWith("en"))||null;}
@@ -172,8 +190,6 @@ if("speechSynthesis" in window){pickVoice();speechSynthesis.onvoiceschanged=pick
 function say(t,rate){if(!("speechSynthesis" in window))return;
   speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);
   u.lang="en-US";if(VOICE)u.voice=VOICE;u.rate=rate||0.85;speechSynthesis.speak(u);}
-
-/* ============ 音效 (WebAudio 小鼓垫) ============ */
 let AC=null;
 function beep(good){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();
   const o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);
@@ -190,68 +206,81 @@ function showCombo(){comboN++;if(comboN<2)return;const c=document.getElementById
 
 /* ============ 工具 ============ */
 const $=s=>document.querySelector(s);
+let REC=true; // 预习模式下置 false:不记录错词
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function pick(a,n){return shuffle(a).slice(0,n);}
-function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");}
 function hlPat(w,pat){if(!pat)return esc(w);
   if(pat.includes("_")){const[a]=pat.split("_");const i=w.indexOf(a);
     if(i>=0&&w.endsWith("e"))return esc(w.slice(0,i))+'<span class="pat">'+esc(w[i])+'</span>'+esc(w.slice(i+1,-1))+'<span class="pat">e</span>';
     return esc(w);}
   const i=w.indexOf(pat);if(i<0)return esc(w);
   return esc(w.slice(0,i))+'<span class="pat">'+esc(pat)+'</span>'+esc(w.slice(i+pat.length));}
-function optionsFor(word,unit){const pool=unit?unit.words.filter(w=>w!==word):[];
+function allOf(u){return u.words.concat(u.adv||[]);}
+function optionsFor(word,unit){const pool=unit?allOf(unit).filter(w=>w!==word):[];
   const extra=ALL_WORDS.filter(w=>w!==word&&!pool.includes(w)&&Math.abs(w.length-word.length)<=2);
-  return shuffle([word].concat(pick(pool,3).concat(pick(extra,3)).slice(0,3)));}
+  let ds=pick(pool,3).concat(pick(extra,3)).slice(0,3);
+  const mp=MINPAIRS[word]; // 最小对立对优先当干扰项
+  if(mp&&!ds.includes(mp))ds=[mp].concat(ds.slice(0,2));
+  return shuffle([word].concat(ds));}
 function unitById(id){return UNITS.find(u=>u.id===id);}
 function learnedUnits(){return UNITS.filter(u=>P.done[u.id]&&!P.skipped[u.id]);}
 function nextUnit(){return UNITS.find(u=>!P.done[u.id]);}
+function unitWrongs(u){return allOf(u).reduce((n,w)=>n+(P.wordWrong[w]||0),0);}
+function markWrong(w){if(!REC)return;P.wordWrong[w]=(P.wordWrong[w]||0)+1;saveP();}
 
 /* ============ 渲染框架 ============ */
 function render(html){$("#app").innerHTML=
  '<div class="topbar"><div class="brand">⚡ 拼读小任务</div><div class="streak">🔥 '+P.streak+' 天</div></div>'+
  '<div class="stage">'+html+'</div>';}
 
-/* ============ 首页 ============ */
-function home(){comboN=0;
+/* ============ 首页与地图 ============ */
+function home(){comboN=0;REC=true;
   let mission,label;
-  if(P.stage==="diagnostic"){label="第 1 天 · 摸底小侦察";mission="开始侦察 (约8分钟)";}
+  if(P.stage==="diagnostic"){label="第 1 天 · 拼写摸底";mission="开始摸底 (约12分钟)";}
   else if(P.stage==="phonics"){
     if(P.gradStep>0){label="毕业闯关 "+P.gradStep+"/2";mission="开始闯关";}
-    else if((P.sessions+1)%7===0){label="第 "+(P.sessions+1)+" 天 · 游戏复习日 🎮";mission="开始游戏";}
     else{const u=nextUnit();label="第 "+(P.sessions+1)+" 天 · "+(u?u.name:"复习");mission="开始今日任务 (10分钟)";}}
-  else if(P.stage==="reading"){label="阅读星球 · 第 "+(P.storyIdx+1)+"/30 篇";mission="开始今日故事 (10分钟)";}
-  else{label="全部完成!";mission="再玩一次终极挑战";}
-  const nodes=mapNodes();
+  else{label="主线通关 🎓 自由训练时代";mission="🎮 进挑战馆";}
   render('<div class="card"><h1>'+label+'</h1>'+
    '<div class="sub">'+stageHint()+'</div>'+
    '<button class="btn" onclick="startSession()">'+mission+'</button>'+
+   (P.stage!=="done"?'<button class="btn ghost" onclick="challengeHall()">🎮 挑战馆(随时来玩)</button>':'')+
    '<button class="btn ghost" onclick="say(\'Hello! Let us learn phonics!\')">🔊 试试发音</button></div>'+
-   '<h2 class="mt">任务地图</h2><div class="map">'+nodes+'</div>'+
-   '<div class="footer-note">每天 10 分钟 · 到点就休息 · 明天见 · v2</div>');}
+   '<h2 class="mt">任务地图 · 点任何星球进去玩</h2><div class="map">'+mapNodes()+'</div>'+
+   '<div class="footer-note">主线每天一条规律 · 地图随便逛 · 橙点=待加强 · v3</div>');}
 function stageHint(){
-  if(P.stage==="diagnostic")return "先做个小测试,你已经会的规律直接跳过,不浪费时间。";
+  if(P.stage==="diagnostic")return "11 道拼词题,拼对的规律直接跳过——这次要动手拼,不只是听。答错完全没关系。";
   if(P.stage==="phonics"){const done=Object.keys(P.done).length,skip=Object.keys(P.skipped).length;
-    return "已点亮 "+done+"/29 个规律"+(skip?"(其中 "+skip+" 个测试直接通过 ✨)":"")+"。";}
-  if(P.stage==="reading")return "规律都学完了!现在用 30 个小故事把它们变成真本事。";
-  return "拼读之旅完成 🎉 之后的拼写,交给你每天读的漫画和小说吧。";}
+    return "已点亮 "+done+"/29 条规律"+(skip?"(其中 "+skip+" 条摸底直接通过 ✨)":"")+"。地图上任何规律都能点:学过的复习,没学的预习。";}
+  return "29 条规律全部点亮!故事馆 30 篇已解锁,挑战馆常开——想练哪个练哪个。";}
 function mapNodes(){let h="";
-  UNITS.forEach(u=>{const st=P.skipped[u.id]?"done":P.done[u.id]?"done":(P.stage==="phonics"&&nextUnit()&&nextUnit().id===u.id?"now":"");
-    h+='<div class="node '+st+'">'+esc(u.pat)+'<small>'+PHASE_NAMES[u.ph]+'</small></div>';});
-  for(let i=0;i<30;i++){const st=i<P.storyIdx?"done":(P.stage==="reading"&&i===P.storyIdx?"now":"");
-    h+='<div class="node story '+st+'">📖<small>故事'+(i+1)+'</small></div>';}
+  const nu=nextUnit();
+  UNITS.forEach(u=>{
+    const learned=P.done[u.id];
+    const st=learned?"done":(P.stage==="phonics"&&nu&&nu.id===u.id?"now":"");
+    const dot=(learned&&!P.skipped[u.id]&&unitWrongs(u)>=2)?'<i class="dot"></i>':'';
+    h+='<div class="node '+st+'" onclick="tapUnit(\''+u.id+'\')">'+dot+esc(u.pat)+'<small>'+PHASE_NAMES[u.ph]+'</small></div>';});
+  const open=P.stage==="done";
+  for(let i=0;i<STORIES.length;i++){
+    const st=P.storyDone[i]?"done":"";
+    if(open)h+='<div class="node story '+st+'" onclick="playStory('+i+')">📖<small>故事'+(i+1)+'</small></div>';
+    else h+='<div class="node story lock">🔒<small>毕业解锁</small></div>';}
   return h;}
+function tapUnit(uid){beep(true);const u=unitById(uid);
+  if(P.done[uid])return freeReview(uid);
+  const nu=nextUnit();
+  if(P.stage==="phonics"&&nu&&nu.id===uid)return startSession(); // 点到今日主线,直接开始
+  return preview(uid);}
 function startSession(){beep(true);
   if(P.stage==="diagnostic")return diagStart();
   if(P.stage==="phonics"){
     if(P.gradStep>0)return gradStart();
-    if((P.sessions+1)%7===0)return reviewDay();
     const u=nextUnit();if(!u){P.gradStep=1;saveP();return gradStart();}
     return teach(u);}
-  if(P.stage==="reading")return storyStart();
-  return challenge(learnedUnits(),null,()=>home(),60);}
+  return challengeHall();}
 
-/* ============ 通用题型 ============ */
-// 听音选词
+/* ============ 通用题型(REC 控制是否记错词) ============ */
 function qListen(word,unit,onDone){const opts=optionsFor(word,unit);
   render('<div class="card"><h2>听一听,选出你听到的词</h2>'+
    '<button class="speaker" onclick="say(\''+word+'\')">🔊</button>'+
@@ -260,11 +289,10 @@ function qListen(word,unit,onDone){const opts=optionsFor(word,unit);
   document.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{
     const ok=b.dataset.w===word;
     if(ok){b.classList.add("right");beep(true);showCombo();}
-    else{b.classList.add("wrong");beep(false);comboN=0;P.wordWrong[word]=(P.wordWrong[word]||0)+1;saveP();
+    else{b.classList.add("wrong");beep(false);comboN=0;markWrong(word);
       document.querySelectorAll(".opt").forEach(x=>{if(x.dataset.w===word)x.classList.add("right");});say(word);}
     document.querySelectorAll(".opt").forEach(x=>x.onclick=null);
     setTimeout(()=>onDone(ok),ok?600:1400);});}
-// 拼词积木
 function qBuild(word,unit,onDone){const letters=shuffle(word.split(""));let idx=0,mistakes=0;
   render('<div class="card"><h2>听一听,把单词拼出来</h2>'+
    '<button class="speaker" onclick="say(\''+word+'\')">🔊</button>'+
@@ -275,17 +303,15 @@ function qBuild(word,unit,onDone){const letters=shuffle(word.split(""));let idx=
   document.querySelectorAll(".tile").forEach(t=>t.onclick=()=>{
     if(t.dataset.l===word[idx]){t.classList.add("used");slots[idx].textContent=word[idx];idx++;beep(true);
       if(idx===word.length){showCombo();say(word);
-        if(mistakes>0){P.wordWrong[word]=(P.wordWrong[word]||0)+1;saveP();}
+        if(mistakes>0)markWrong(word);
         setTimeout(()=>onDone(mistakes===0),900);}}
     else{t.classList.add("bad");beep(false);comboN=0;mistakes++;setTimeout(()=>t.classList.remove("bad"),350);}});}
-// 顺序执行一串题
 function runQueue(qs,after){let i=0,score=0;
   (function next(ok){if(ok===true)score++;
     if(i>=qs.length)return after(score,qs.length);
     const q=qs[i++];q(next);})();}
-// 限时挑战
 function challenge(units,pat,after,secs){secs=secs||60;let score=0,alive=true;const end=Date.now()+secs*1000;
-  const pool=units.flatMap(u=>u.words.map(w=>({w,u})));
+  const pool=units.flatMap(u=>allOf(u).map(w=>({w,u})));
   function tick(){if(!alive)return;const left=Math.max(0,Math.ceil((end-Date.now())/1000));
     const el=document.getElementById("tleft");if(el)el.textContent="⏱ "+left+" 秒 · 已答对 "+score;
     if(left<=0){alive=false;finish();return;}
@@ -298,78 +324,134 @@ function challenge(units,pat,after,secs){secs=secs||60;let score=0,alive=true;co
   function finish(){speechSynthesis.cancel();
     window.afterChallenge=()=>after(score);
     render('<div class="card center"><div class="result-star">'+(score>=10?"🏆":score>=6?"⭐️⭐️⭐️":"⭐️")+'</div>'+
-     '<h1>时间到!答对 '+score+' 题</h1><div class="sub">'+(score>=10?"神速!下次能更快吗?":"很棒,明天再来刷新纪录!")+'</div>'+
+     '<h1>时间到!答对 '+score+' 题</h1><div class="sub">'+(score>=10?"神速!下次能更快吗?":"很棒,下次刷新纪录!")+'</div>'+
      '<button class="btn" onclick="afterChallenge()">继续</button></div>');}
   ask();tick();}
-/* ============ 诊断 ============ */
+
+/* ============ 摸底诊断(升级为拼词积木) ============ */
 function diagStart(){
-  render('<div class="card"><h1>摸底小侦察 🕵️</h1>'+
-   '<div class="sub">11 道听音选词题,测测哪些规律你已经会了——会的直接跳过,不用再学。答错完全没关系,这不是考试。</div>'+
+  render('<div class="card"><h1>拼写摸底 🕵️</h1>'+
+   '<div class="sub">11 道拼词题——听读音,把词拼出来。一次拼对的规律直接跳过,不用再学。这不是考试,拼错的正好留着学。</div>'+
    '<button class="btn" onclick="diagRun()">出发</button></div>');}
 function diagRun(){const qs=[],res={};
   DIAG_UNITS.forEach(id=>{const u=unitById(id);const w=pick(u.words,1)[0];
-    qs.push(next=>qListen(w,u,ok=>{res[id]=ok;next(ok);}));});
+    qs.push(next=>qBuild(w,u,ok=>{res[id]=ok;next(ok);}));});
   runQueue(shuffle(qs),(score,total)=>{
     let skipped=0;DIAG_UNITS.forEach(id=>{if(res[id]){P.done[id]=true;P.skipped[id]=true;skipped++;}});
     P.diagScore=score+"/"+total;P.stage="phonics";bumpStreak();saveP();
+    const left=29-skipped;
     render('<div class="card center"><div class="result-star">✨</div>'+
-     '<h1>侦察完成!</h1><div class="sub">答对 '+score+'/'+total+' 题,已有 <b>'+skipped+'</b> 个规律直接点亮跳过。<br>明天开始正式任务,每天 10 分钟。</div>'+
+     '<h1>摸底完成!</h1><div class="sub">拼对 '+score+'/'+total+',<b>'+skipped+'</b> 条规律直接点亮。<br>剩余 '+left+' 条,每天一条,约 '+left+' 天通关。明天开始!</div>'+
      '<button class="btn" onclick="home()">回到任务地图</button></div>');});}
 
-/* ============ 教学日:复习→新规律→练习→挑战 ============ */
+/* ============ 每日主线:热身→(弹性巩固)→新规律→练习→挑战 ============ */
 function teach(u){
-  // 第一步:2 分钟滚动复习(5 题,优先错过的词)
   const learned=learnedUnits();
-  const wrongs=Object.keys(P.wordWrong).filter(w=>learned.some(u2=>u2.words.includes(w)))
+  const wrongs=Object.keys(P.wordWrong).filter(w=>learned.some(u2=>allOf(u2).includes(w)))
     .sort((a,b)=>P.wordWrong[b]-P.wordWrong[a]);
-  const revWords=wrongs.slice(0,3).concat(pick(learned.flatMap(x=>x.words),5)).slice(0,5);
-  const revQs=revWords.map(w=>{const uu=UNITS.find(x=>x.words.includes(w));
+  const revWords=wrongs.slice(0,3).concat(pick(learned.flatMap(x=>allOf(x)),5)).slice(0,5);
+  const revQs=revWords.map(w=>{const uu=UNITS.find(x=>allOf(x).includes(w));
     return next=>qListen(w,uu,next);});
-  const doTeach=()=>{
-    render('<div class="card"><div class="sub">今日新规律 · '+PHASE_NAMES[u.ph]+'</div>'+
-     '<div class="patbig">'+esc(u.pat)+'</div><h2 class="center">'+esc(u.name)+'</h2>'+
-     '<div class="sub center">'+esc(u.cn)+'</div>'+
-     '<div class="sub center mt">点每个词听发音,注意<span style="color:var(--violet)">紫色部分</span>都是同一个音 👇</div>'+
-     '<div class="exwords">'+u.words.map(w=>'<button class="exw" data-w="'+w+'">'+hlPat(w,u.pat)+'</button>').join("")+'</div>'+
-     '<button class="btn" onclick="teachPractice(\''+u.id+'\')">我发现规律了,开练!</button></div>');
-    document.querySelectorAll(".exw").forEach(b=>b.onclick=()=>{beep(true);say(b.dataset.w);});};
-  if(revQs.length===0)return doTeach();
-  render('<div class="card"><h2>先热身:复习昨天的 (5 题)</h2>'+
-   '<button class="btn" onclick="teachRev(\''+u.id+'\')">开始</button></div>');
-  window.teachRev=()=>runQueue(revQs,()=>doTeach());
-  window._doTeach=doTeach;}
-function teachPractice(uid){const u=unitById(uid);
-  const ws=shuffle(u.words);
-  const qs=[
-    next=>qListen(ws[0],u,next),
-    next=>qBuild(ws[1],u,next),
-    next=>qListen(ws[2],u,next),
-    next=>qBuild(ws[3],u,next),
-    next=>qListen(ws[4],u,next)];
-  runQueue(qs,(score,total)=>{
+  if(revQs.length===0)return teachCard(u,false);
+  render('<div class="card"><h2>先热身:复习学过的 (5 题)</h2>'+
+   '<div class="sub">热身也是雷达:错太多的话,今天先巩固再前进。</div>'+
+   '<button class="btn" id="go">开始</button></div>');
+  $("#go").onclick=()=>runQueue(revQs,(score,total)=>{
+    if(total>=5&&score<=2&&P.lastLearned){ // 弹性巩固日
+      const lu=unitById(P.lastLearned);
+      render('<div class="card center"><div class="result-star">🛠</div><h1>今天是巩固日</h1>'+
+       '<div class="sub">热身 '+score+'/'+total+'——不着急,罗马不是一天建成的。今天把「'+esc(lu.name)+'」再夯实一遍,新规律明天见。</div>'+
+       '<button class="btn" id="g2">开始巩固</button></div>');
+      $("#g2").onclick=()=>teachCard(lu,true);}
+    else teachCard(u,false);});}
+function teachCard(u,consolidate){
+  render('<div class="card"><div class="sub">'+(consolidate?"巩固日 · ":"今日新规律 · ")+PHASE_NAMES[u.ph]+'</div>'+
+   '<div class="patbig">'+esc(u.pat)+'</div><h2 class="center">'+esc(u.name)+'</h2>'+
+   '<div class="sub center">'+esc(u.cn)+'</div>'+
+   '<div class="sub center mt">基础词 👇 点词听发音</div>'+
+   '<div class="exwords">'+u.words.map(w=>'<button class="exw" data-w="'+w+'">'+hlPat(w,u.pat)+'</button>').join("")+'</div>'+
+   '<div class="sub center mt">进阶词 💪 同一条规律,更硬的词</div>'+
+   '<div class="exwords">'+(u.adv||[]).map(w=>'<button class="exw" data-w="'+w+'">'+hlPat(w,u.pat)+'</button>').join("")+'</div>'+
+   '<button class="btn" onclick="teachPractice(\''+u.id+'\','+(consolidate?1:0)+')">我发现规律了,开练!</button></div>');
+  document.querySelectorAll(".exw").forEach(b=>b.onclick=()=>{beep(true);say(b.dataset.w);});}
+function teachPractice(uid,consolidate){const u=unitById(uid);
+  const b=shuffle(u.words),a=shuffle(u.adv||u.words);
+  const qs=[ // 3基础+2进阶,先易后难
+    next=>qListen(b[0],u,next),
+    next=>qBuild(b[1],u,next),
+    next=>qListen(a[0],u,next),
+    next=>qBuild(a[1]||b[2],u,next),
+    next=>qListen(b[2],u,next)];
+  runQueue(qs,()=>{
     render('<div class="card center"><h1>最后一关:60 秒闪电挑战 ⚡</h1>'+
      '<div class="sub">新旧单词混在一起,答对越多越好!</div>'+
-     '<button class="btn" onclick="teachChal(\''+u.id+'\')">开始挑战</button></div>');});}
-function teachChal(uid){const u=unitById(uid);
-  const units=learnedUnits().concat([u]);
+     '<button class="btn" onclick="teachChal(\''+u.id+'\','+consolidate+')">开始挑战</button></div>');});}
+function teachChal(uid,consolidate){const u=unitById(uid);
+  const units=learnedUnits().concat(P.done[uid]?[]:[u]);
   challenge(units,null,()=>{
-    P.done[u.id]=true;P.sessions++;bumpStreak();saveP();
-    sessionDone("规律 <b>"+esc(u.pat)+"</b> 点亮!");});}
+    if(!consolidate){P.done[u.id]=true;P.lastLearned=u.id;}
+    P.sessions++;P.mainDay=todayStr();bumpStreak();saveP();
+    sessionDone(consolidate?"巩固完成,地基更牢了 🛠":"规律 <b>"+esc(u.pat)+"</b> 点亮!");});}
 function sessionDone(msg){
   render('<div class="card center"><div class="result-star">🌟</div><h1>今日任务完成!</h1>'+
    '<div class="sub">'+msg+'<br>连续学习 🔥 '+P.streak+' 天。今天到此为止——明天见!</div>'+
    '<button class="btn" onclick="home()">回到任务地图</button></div>');}
 
-/* ============ 游戏复习日 ============ */
-function reviewDay(){
-  render('<div class="card center"><h1>游戏复习日 🎮</h1>'+
-   '<div class="sub">今天没有新内容!连续两轮 60 秒挑战,试着打破自己的纪录。</div>'+
-   '<button class="btn" onclick="revChal(1)">第一轮,开始!</button></div>');}
-function revChal(round){challenge(learnedUnits(),null,score=>{
+/* ============ 自由复习 / 预习 / 挑战馆 ============ */
+function freeDone(title,msg){bumpStreak();saveP();
+  const pending=(P.stage!=="done")&&(P.mainDay!==todayStr());
+  render('<div class="card center"><div class="result-star">🌟</div><h1>'+title+'</h1>'+
+   '<div class="sub">'+msg+(pending?"<br><br>打卡成功!今天的<b>主线任务</b>还在首页等你。":"")+'</div>'+
+   '<button class="btn" onclick="home()">回到任务地图</button></div>');}
+function freeReview(uid){const u=unitById(uid);REC=true;
+  render('<div class="card"><div class="sub">自由复习 · '+PHASE_NAMES[u.ph]+(unitWrongs(u)>=2?' · 🟠 这条最近错得多,来对地方了':'')+'</div>'+
+   '<div class="patbig">'+esc(u.pat)+'</div><h2 class="center">'+esc(u.name)+'</h2>'+
+   '<div class="sub center">'+esc(u.cn)+'</div>'+
+   '<div class="sub center mt">基础词</div>'+
+   '<div class="exwords">'+u.words.map(w=>'<button class="exw" data-w="'+w+'">'+hlPat(w,u.pat)+'</button>').join("")+'</div>'+
+   '<div class="sub center mt">进阶词 💪</div>'+
+   '<div class="exwords">'+(u.adv||[]).map(w=>'<button class="exw" data-w="'+w+'">'+hlPat(w,u.pat)+'</button>').join("")+'</div>'+
+   '<button class="btn" onclick="reviewQuiz(\''+uid+'\')">开始检验 (5 题,拼写为主)</button>'+
+   '<button class="btn ghost" onclick="home()">← 回地图</button></div>');
+  document.querySelectorAll(".exw").forEach(b=>b.onclick=()=>{beep(true);say(b.dataset.w);});}
+function reviewQuiz(uid){const u=unitById(uid);
+  const b=shuffle(u.words),a=shuffle(u.adv||u.words);
+  const qs=[ // 复习重产出:1听+3拼+1听,2基础+3进阶
+    next=>qListen(a[0],u,next),
+    next=>qBuild(b[0],u,next),
+    next=>qBuild(a[1]||b[1],u,next),
+    next=>qBuild(a[2]||b[2],u,next),
+    next=>qListen(b[1],u,next)];
+  runQueue(qs,(score,total)=>freeDone("复习完成!",
+    "「"+esc(u.name)+"」检验 "+score+"/"+total+(score>=4?" —— 这条规律很稳!":" —— 还有点滑,过两天再来一次。")));}
+function preview(uid){const u=unitById(uid);
+  render('<div class="card"><div class="sub">预习 · 这条规律还没教到,先混个脸熟 👀</div>'+
+   '<div class="patbig">'+esc(u.pat)+'</div><h2 class="center">'+esc(u.name)+'</h2>'+
+   '<div class="sub center">'+esc(u.cn)+'</div>'+
+   '<div class="sub center mt">点词听发音,找找规律的感觉</div>'+
+   '<div class="exwords">'+u.words.map(w=>'<button class="exw" data-w="'+w+'">'+hlPat(w,u.pat)+'</button>').join("")+'</div>'+
+   '<button class="btn" onclick="previewTry(\''+uid+'\')">玩 3 道体验题(不计成绩)</button>'+
+   '<button class="btn ghost" onclick="home()">← 回地图</button></div>');
+  document.querySelectorAll(".exw").forEach(b=>b.onclick=()=>{beep(true);say(b.dataset.w);});}
+function previewTry(uid){const u=unitById(uid);REC=false; // 预习不留错词痕迹
+  const ws=shuffle(u.words);
+  runQueue([
+    next=>qListen(ws[0],u,next),
+    next=>qBuild(ws[1],u,next),
+    next=>qListen(ws[2],u,next)],
+   (score,total)=>{REC=true;
+    freeDone("预习完成!","「"+esc(u.name)+"」体验 "+score+"/"+total+"。等主线教到这条时,你已经不是新手了 😎");});}
+function challengeHall(){
+  render('<div class="card center"><h1>挑战馆 🎮</h1>'+
+   '<div class="sub">连续两轮 60 秒挑战,第二轮打破第一轮!</div>'+
+   '<button class="btn" onclick="hallChal(1)">第一轮,开始!</button>'+
+   '<button class="btn ghost" onclick="home()">← 回地图</button></div>');}
+function hallChal(round){const units=learnedUnits().length?learnedUnits():UNITS.slice(0,5);
+  challenge(units,null,score=>{
   if(round===1){render('<div class="card center"><h1>第一轮:'+score+' 题</h1>'+
     '<div class="sub">喝口水,第二轮超过它!</div>'+
-    '<button class="btn" onclick="revChal(2)">第二轮,开始!</button></div>');}
-  else{P.sessions++;bumpStreak();saveP();sessionDone("复习日完成,大脑充电成功 ⚡");}});}
+    '<button class="btn" onclick="hallChal(2)">第二轮,开始!</button></div>');}
+  else freeDone("挑战完成!","大脑充电成功 ⚡ 随时再来。");});}
 
 /* ============ 毕业闯关(2 天) ============ */
 function gradStart(){if(P.gradStep===0)P.gradStep=1;saveP();
@@ -378,19 +460,18 @@ function gradStart(){if(P.gradStep===0)P.gradStep=1;saveP();
    '<button class="btn" onclick="gradRun()">开始</button></div>');}
 function gradRun(){const units=learnedUnits();
   if(P.gradStep===1){
-    const ws=pick(units.flatMap(u=>u.words),12);
-    runQueue(ws.map(w=>{const u=UNITS.find(x=>x.words.includes(w));return next=>qListen(w,u,next);}),
-     (score,total)=>{P.gradScore=score+"/"+total;P.gradStep=2;P.sessions++;bumpStreak();saveP();
-      sessionDone("第一关成绩:<b>"+score+"/"+total+"</b>(还记得第 1 天的侦察成绩吗:"+P.diagScore+")");});}
-  else{const ws=pick(units.flatMap(u=>u.words).filter(w=>w.length<=5),6);
-    runQueue(ws.map(w=>{const u=UNITS.find(x=>x.words.includes(w));return next=>qBuild(w,u,next);}),
+    const ws=pick(units.flatMap(u=>allOf(u)),12);
+    runQueue(ws.map(w=>{const u=UNITS.find(x=>allOf(x).includes(w));return next=>qListen(w,u,next);}),
+     (score,total)=>{P.gradScore=score+"/"+total;P.gradStep=2;P.sessions++;P.mainDay=todayStr();bumpStreak();saveP();
+      sessionDone("第一关成绩:<b>"+score+"/"+total+"</b>(还记得第 1 天的摸底成绩吗:"+P.diagScore+")");});}
+  else{const ws=pick(units.flatMap(u=>allOf(u)).filter(w=>w.length<=6),6);
+    runQueue(ws.map(w=>{const u=UNITS.find(x=>allOf(x).includes(w));return next=>qBuild(w,u,next);}),
      ()=>challenge(units,null,score=>{
-      P.gradStep=0;P.stage="reading";P.sessions++;bumpStreak();saveP();
+      P.gradStep=0;P.stage="done";P.sessions++;P.mainDay=todayStr();bumpStreak();saveP();
       render('<div class="card center"><div class="result-star">🎓</div><h1>拼读规律,毕业!</h1>'+
-       '<div class="sub">终极挑战:'+score+' 题。29 个规律全部点亮。<br>明天起进入<b>阅读星球</b>:30 个为你定制的小故事,把规律变成真本事。</div>'+
-       '<button class="btn" onclick="home()">去看看阅读星球</button></div>');}));}}
+       '<div class="sub">终极挑战:'+score+' 题。29 条规律全部点亮。<br><b>故事馆 30 篇已解锁</b>,挑战馆常开——从今天起,想练哪个练哪个。</div>'+
+       '<button class="btn" onclick="home()">去看看地图</button></div>');}));}}
 
-/* ============ 30 篇定制故事(阅读星球) ============ */
 const STORIES=[
 {t:"The Big Game",pats:["a_e"],cn:"鼓手 Max 的大日子",
  text:"Max has a red drum. Today his band will play a big game show at school. Max is not late. He puts on a brave face and takes his place on the stage. Bang! Bang! He plays a safe beat, then a wild beat. The kids all shout his name. Max made the show great. What a day!",
@@ -484,7 +565,7 @@ const STORIES=[
  q:{q:"最后男孩怎么赢的?",opts:["在最后一道门急转弯","按了暂停","换了游戏"],a:0}}
 ];
 
-/* ============ 阅读星球引擎 ============ */
+/* ============ 故事馆引擎(毕业后解锁,自由点播) ============ */
 function matcher(pat){
   if(pat==="syll")return w=>w.length>=6;
   if(pat.includes("_")){const a=pat[0];return w=>new RegExp(a+"[bcdfghjklmnpqrstvwz]e$").test(w);}
@@ -494,15 +575,17 @@ function matcher(pat){
   if(pat==="ge")return w=>w.includes("ge")||w.includes("gi");
   return w=>w.includes(pat);}
 function cleanWord(w){return w.toLowerCase().replace(/[^a-z]/g,"");}
-function storyStart(){const s=STORIES[P.storyIdx];
+function playStory(idx){beep(true);const s=STORIES[idx];
   const words=s.text.split(" ");
   render('<div class="card">'+
-   s.pats.map(p=>'<span class="badge">今日规律 '+esc(p)+'</span>').join("")+
+   s.pats.map(p=>'<span class="badge">规律 '+esc(p)+'</span>').join("")+
+   (P.storyDone[idx]?'<span class="badge">已读过 · 重刷加深 ✔</span>':'')+
    '<div class="stitle">'+esc(s.t)+'</div><div class="sub">'+esc(s.cn)+' · 点任何单词都能听发音</div>'+
-   '<div class="story">'+words.map((w,i)=>'<span class="w" data-w="'+cleanWord(w)+'">'+esc(w)+'</span>').join(" ")+'</div>'+
-   '<button class="btn" onclick="storyQuiz()">读完了 →</button></div>');
+   '<div class="story">'+words.map(w=>'<span class="w" data-w="'+cleanWord(w)+'">'+esc(w)+'</span>').join(" ")+'</div>'+
+   '<button class="btn" onclick="storyQuiz('+idx+')">读完了 →</button>'+
+   '<button class="btn ghost" onclick="home()">← 回地图</button></div>');
   document.querySelectorAll(".story .w").forEach(el=>el.onclick=()=>{if(el.dataset.w)say(el.dataset.w);});}
-function storyQuiz(){const s=STORIES[P.storyIdx];
+function storyQuiz(idx){const s=STORIES[idx];
   render('<div class="card"><h2>'+esc(s.q.q)+'</h2>'+
    '<div class="opts" style="grid-template-columns:1fr">'+
    s.q.opts.map((o,i)=>'<button class="opt" style="font-size:19px" data-i="'+i+'">'+esc(o)+'</button>').join("")+'</div></div>');
@@ -511,8 +594,8 @@ function storyQuiz(){const s=STORIES[P.storyIdx];
     b.classList.add(ok?"right":"wrong");beep(ok);
     if(!ok)document.querySelectorAll(".opt").forEach(x=>{if(+x.dataset.i===s.q.a)x.classList.add("right");});
     document.querySelectorAll(".opt").forEach(x=>x.onclick=null);
-    setTimeout(()=>hunter(),ok?700:1500);});}
-function hunter(){const s=STORIES[P.storyIdx];
+    setTimeout(()=>hunter(idx),ok?700:1500);});}
+function hunter(idx){const s=STORIES[idx];
   const ms=s.pats.map(matcher);
   const words=s.text.split(" ");
   const isTgt=w=>{const c=cleanWord(w);return c&&ms.some(m=>m(c));};
@@ -525,26 +608,20 @@ function hunter(){const s=STORIES[P.storyIdx];
    words.map(w=>'<span class="w" data-w="'+cleanWord(w)+'">'+esc(w)+'</span>').join(" ")+'</div></div>');
   function tick(){if(!alive)return;const left=Math.max(0,Math.ceil((end-Date.now())/1000));
     const el=document.getElementById("tleft");if(el)el.textContent="⏱ "+left+" 秒 · 找到 "+found.size+"/"+total;
-    if(left<=0){alive=false;return huntDone(found.size,total,false);}
+    if(left<=0){alive=false;return huntDone(idx,found.size,total,false);}
     setTimeout(tick,250);}
   document.querySelectorAll(".story .w").forEach(el=>el.onclick=()=>{if(!alive)return;
     const c=el.dataset.w;if(!c)return;
     if(isTgt(c)){if(!found.has(c)){found.add(c);beep(true);showCombo();say(c,1);
         document.querySelectorAll('.story .w[data-w="'+c+'"]').forEach(x=>x.classList.add("hit"));
-        if(found.size===total){alive=false;huntDone(found.size,total,true);}}}
+        if(found.size===total){alive=false;huntDone(idx,found.size,total,true);}}}
     else{beep(false);comboN=0;}});
   tick();}
-function huntDone(found,total,all){const s=STORIES[P.storyIdx];
-  P.storyIdx++;P.sessions++;bumpStreak();
-  const finished=P.storyIdx>=STORIES.length;
-  if(finished)P.stage="done";
-  saveP();
-  render('<div class="card center"><div class="result-star">'+(all?"🏆":"🌟")+'</div>'+
-   '<h1>'+(all?"全部找到!":("找到 "+found+"/"+total))+'</h1>'+
-   '<div class="sub">故事《'+esc(s.t)+'》完成!'+(finished?
-     "<br><br><b>75 天拼读之旅,全部通关!🎉</b><br>从今天起,拼写就交给你每天读的漫画和小说了。这个 App 可以光荣退休,或者随时回来玩挑战。":
-     "<br>明天:第 "+(P.storyIdx+1)+" 篇故事等着你。")+'</div>'+
-   '<button class="btn" onclick="home()">回到任务地图</button></div>');}
+function huntDone(idx,found,total,all){const s=STORIES[idx];
+  P.storyDone[idx]=true;saveP();
+  const doneN=Object.keys(P.storyDone).length;
+  freeDone(all?"全部找到!🏆":("找到 "+found+"/"+total),
+   "故事《"+esc(s.t)+"》完成!故事馆进度 "+doneN+"/"+STORIES.length+(doneN>=STORIES.length?" —— 30 篇全刷完,猎人满级 🎉":""));}
 
 /* ============ 启动 ============ */
 window.addEventListener("load",home);
